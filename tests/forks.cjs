@@ -1,0 +1,34 @@
+const assert=require('node:assert/strict'),S=require('../static/map.js');
+const choice=(source,index,target,text='choice '+index)=>({key:source+':0:'+index,target,text,condition:'',action:'',hidden:false,default:false});
+const node=(id,targets=[],type=1)=>({id,title:id,leaf:!targets.length,missing:false,questions:targets.length?[{type,title:'',choices:targets.map((t,i)=>choice(id,i,t))}]:[]});
+const graph=nodes=>({root:nodes[0].id,nodes,analysis:{cycles:[],traps:[]}});
+const direct=graph([node('fork',['he','be']),node('he'),node('be')]);
+const original=JSON.stringify(direct),model=S.create(direct),view=S.build(model,{mode:'compact'});
+assert.equal(model.endingForks.get('fork').endingCount,2);
+assert.deepEqual(model.endingForks.get('fork').options.map(c=>c.endingId),['he','be']);
+assert.equal(model.endingChoices.size,2);
+const positions=S.layout(view).positions;
+assert.ok(positions.get('fork').h>82);
+for(const id of ['he','be'])assert.ok(positions.get(id).y>positions.get('fork').y+positions.get('fork').h);
+assert.equal(JSON.stringify(direct),original);
+const automatic=graph([node('fork',['a','be']),node('a',['b'],0),node('b',['he'],0),node('he'),node('be')]);
+assert.equal(S.create(automatic).endingForks.get('fork').options[0].hops,2);
+for(const mutate of [g=>g.nodes[1].questions[0].type=1,g=>g.nodes[1].questions[0].choices[0].condition='score>0',g=>g.nodes[1].questions[0].choices[0].action='score+=1',g=>g.nodes[1].missing=true,g=>g.nodes[2].questions[0].choices[0].target='a',g=>g.nodes[1].questions[0].choices.push(choice('a',1,'be'))]){
+  const g=JSON.parse(JSON.stringify(automatic));mutate(g);assert.equal(S.create(g).endingForks.has('fork'),false);
+}
+const sameEnding=JSON.parse(original);sameEnding.ending_groups=[{id:'he',key:'same-ending',member_ids:['he','be']}];
+assert.equal(S.create(sameEnding).endingForks.size,0,'Copies of one ending do not create a distinct ending fork');
+const multi=JSON.parse(original);multi.nodes[0].questions=[{type:1,choices:[choice('fork',0,'he')]},{type:1,choices:[choice('fork',1,'be')]}];
+assert.equal(S.create(multi).endingForks.size,0,'Different questions are not one decision');
+const conditional=JSON.parse(original);conditional.nodes[0].questions[0].type=0;conditional.nodes[0].questions[0].choices[0].condition='score>=3';
+const cf=S.create(conditional).endingForks.get('fork');assert.equal(cf.options[0].automatic,true);assert.equal(cf.options[0].condition,'score>=3');
+const copies=graph([node('r',['a','b']),node('a',['he','be']),node('b',['he','be']),node('he'),node('be')]);copies.nodes[1].title=copies.nodes[2].title='same';
+const copyModel=S.create(copies),copyView=S.build(copyModel,{mode:'compact'}),group=copyView.nodes.find(n=>n.kind==='duplicates');
+assert.equal(group.endingFork.endingCount,2);assert.equal(group.forkCount,1);assert.equal(group.endingFork.options.length,2);
+const route={steps:[{source:'r',target:'a',key:'r:0:0'},{source:'a',target:'he',key:'a:0:0'}]};
+const routeView=S.build(copyModel,{route});assert.equal(routeView.nodes.length,3);assert.equal(routeView.nodes[1].endingFork.endingCount,2);
+const overview=S.build(copyModel,{mode:'overview'});assert.ok(overview.nodes.some(n=>n.kind==='chapter'&&n.forkCount===1));
+const rootOverview=S.build(model,{mode:'overview'}),rootPosition=S.layout(rootOverview).positions.get('fork');assert.ok(rootPosition.h>82);
+const long=graph([node('fork',['auto0','be']),...Array.from({length:1500},(_,i)=>node('auto'+i,[i===1499?'he':'auto'+(i+1)],0)),node('he'),node('be')]);
+assert.equal(S.create(long).endingForks.get('fork').options[0].hops,1500);
+console.log('Direct ending forks, forced automatic chains, same-ending copies, conditions, uncertain branches/loops, grouped views, route occurrences and card spacing: passed');

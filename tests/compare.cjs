@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),{compare}=require('../static/compare.js');
+const step=(source,key,choice,before={},after=before,condition='',action='')=>({source,key,target:'next',choice,before,after,condition,action,automatic:false});
+const a={id:'A',reachable:true,steps:[step('start','start:0:0','开始'),step('score','score:0:0','加分',{$score:0},{$score:1},'','$score=$score+1'),step('gate','gate:0:0','好结局',{$score:1},{$score:1},'$score>=1')]};
+const b={id:'B',reachable:true,steps:[step('start','start:0:0','开始'),step('score','score:0:1','不加分',{$score:0}),step('gate','gate:0:1','坏结局',{$score:0},{$score:0},'$score<1')]};
+const result=compare(a,b);assert.equal(result.prefix,1);assert.deepEqual(result.decisions.map(d=>d.node),['score','gate']);assert.deepEqual(result.keyNodes,['score','gate']);assert.equal(result.related[0].step.action,'$score=$score+1');assert.equal(result.decisions[1].variables[0].a,1);assert.equal(result.decisions[1].variables[0].b,0);
+assert.equal(compare(a,a),null);assert.equal(compare(a,{...b,reachable:false}),null);
+const repeated={...a,steps:[a.steps[0],a.steps[1],step('score','score:0:0','加分',{$score:1},{$score:2},'','$score=$score+1'),a.steps[2]]};
+assert.equal(compare(repeated,b).prefix,1);assert.equal(compare(repeated,b).decisions.at(-1).node,'gate');
+const multipleQuestions={...b,steps:[b.steps[0],step('score','score:1:1','另一个问题'),b.steps[2]]};assert.equal(compare(a,multipleQuestions).decisions.length,1);
+const stable=JSON.stringify([a,b]);compare(a,b);assert.equal(JSON.stringify([a,b]),stable);
+const dependency={...a,steps:[a.steps[0],step('earlier','earlier:0:0','线索',{$clue:0},{$clue:1},'','$clue=1'),step('calc','calc:0:0','评分',{$clue:1,$score:0},{$clue:1,$score:1},'','$score=$clue'),a.steps[2]]};assert.ok(compare(dependency,b).related.some(d=>d.node==='earlier'));
+const compound={...a,steps:a.steps.map(s=>s.source==='score'?{...s,action:'$score+=1'}:s)};assert.ok(compare(compound,b).related.some(d=>d.step.action==='$score+=1'));
+console.log('Ending comparison: different choices, score dependencies, repeated questions, question identity, immutability: passed');

@@ -1,0 +1,6 @@
+*
+!server.py
+!looper/
+!looper/*.py
+!static/
+!static/*

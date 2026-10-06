@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+data/
+.env
+.env.*
+!.env.example
+.venv/
+node_modules/
+test-results/
+artifacts/
+
+*.pem
+*.key
+*.crt
+*.p12
+.DS_Store

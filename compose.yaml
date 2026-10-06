@@ -1,0 +1,30 @@
+name: story-explorer
+services:
+  app:
+    build: .
+    image: story-explorer:local
+    container_name: story-explorer
+    restart: unless-stopped
+    environment:
+      LOOPER_PUBLIC_ORIGINS: https://story-explorer.nas.haiqingd.top,https://story-explorer.nas.haiqingd.top:1443,https://story-explorer.nas.haiqingd.top:443
+    volumes:
+      - ./data:/app/data
+    networks:
+      - gateway
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      start_period: 10s
+      retries: 3
+networks:
+  gateway:
+    external: true
+    name: host-nginx_default
